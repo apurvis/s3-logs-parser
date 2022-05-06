@@ -17,6 +17,7 @@ class S3LogsParser
         'region' => '',
         'access_key' => '',
         'secret_key' => '',
+        'logs_location' => '',
     ];
 
     /** @var string $regex https://docs.aws.amazon.com/AmazonS3/latest/dev/LogFormat.html */
@@ -74,7 +75,7 @@ class S3LogsParser
      *
      * @return string|false
      */
-    public function getStats(string $bucketName, string $bucketPrefix, string $date)
+    public function getStats($bucketName = null, $bucketPrefix = null, $date = null)
     {
         $logLines = [];
 
@@ -138,6 +139,10 @@ class S3LogsParser
       //       continue;
       //     }
 
+          if ($file->isFile()) {
+            print $file->getFilename() . "\n";
+          }
+
           $fileContents = file_get_contents($file->getPathname(), true);
           $logLines = array_merge($logLines, $this->processLogsStringToArray($fileContents));
       }
@@ -200,7 +205,6 @@ class S3LogsParser
      */
     public function processLogsStringToArray(string $logsString) : array
     {
-        print $logsString;
         $rows = explode("\n", (string) $logsString);
         $output = [];
 
