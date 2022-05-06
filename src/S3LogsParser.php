@@ -135,16 +135,28 @@ class S3LogsParser
     public function loadLogsFromLocalDir(string $logDir) : array
     {
       $logLines = [];
+      $total_operations = [];
       print $logDir;
 
       foreach (new \DirectoryIterator($logDir) as $file) {
           if ($file->isFile()) {
-            // print $file->getFilename() . "\n";
-            $fileContents = file_get_contents($file->getPathname(), true);
-            $logLines = array_merge($logLines, $this->processLogsStringToArray($fileContents));
+              // print 'Processing file: ' . $file->getFilename() . "...\n";
+              $fileContents = file_get_contents($file->getPathname(), true);
+              $processedLogs = $this->processLogsStringToArray($fileContents);
+              $logLines = array_merge($logLines, $processedLogs['output']);
+
+              foreach ($processedLogs['operations'] as $operation_name => $count) {
+                  if (!array_key_exists($operation_name, $total_operations)) {
+                      $total_operations[$operation_name] = 0;
+                  }
+
+                  $total_operations[$operation_name] += (int) $count;
+              }
           }
       }
 
+      print "\n\n****TOTAL OPERATIONS****\n";
+      var_dump($total_operations);
       return $logLines;
     }
 
@@ -172,13 +184,12 @@ class S3LogsParser
                 }
 
                 $statistics[$item['key']]['downloads'] += 1;
-                #$parsedDate = Carbon::parse($item['time'])->format('[d/m/Y:H:i:s');
-                #print "Parsed date: ".$parsedDate;
-                #array_push($statistics[$item['key']]['dates'], $parsedDate);
+                $date = $this->parseLogDateString($item['time']);
+                array_push($statistics[$item['key']]['dates'], $date);
 
                 if (isset($item['bytes'])) {
-                    print "Downloading ".$item['bytes']." from ".$item['key']."\n";
-                    print "\n\n".print_r($item)."\n\n";
+                    // print "Downloading ".$item['bytes']." from ".$item['key']."\n";
+                    // print "\n\n".print_r($item)."\n\n";
                     $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
                 }
             }
@@ -214,6 +225,7 @@ class S3LogsParser
     {
         $rows = explode("\n", (string) $logsString);
         $output = [];
+        $operations = [];
 
         foreach ($rows as $row) {
             $exclude_lines_matching = $this->getConfig('exclude_lines_matching');
@@ -224,13 +236,26 @@ class S3LogsParser
             }
 
             preg_match($this->regex, $row, $matches);
+            // var_dump($matches);
+            if (array_key_exists('operation', $matches)) {
+                $operation = $matches['operation'];
+
+                if (!array_key_exists($operation, $operations)) {
+                    $operations[$operation] = 0;
+                }
+
+                $operations[$matches['operation']] += 1;
+            }
 
             if (isset($matches['operation']) && $matches['operation'] == 'REST.GET.OBJECT') {
                 $output[] = $matches;
             }
         }
 
-        return $output;
+        return [
+            'operations' => $operations,
+            'output' => $output
+        ];
     }
 
     /**
@@ -250,5 +275,18 @@ class S3LogsParser
         }
 
         return $this->client;
+    }
+
+    /**
+     * @param string $dateString
+     *
+     * @return date
+     */
+    private function parseLogDateString(string $dateString)
+    {
+        $dateString = explode(' ', $dateString)[0];
+        $dateString = ltrim($dateString, '[');
+        $dateString = explode(':', $dateString)[0];
+        return Carbon::createFromFormat('d/M/Y', $dateString)->format('Y-m-d');
     }
 }
