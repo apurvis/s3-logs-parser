@@ -101,13 +101,12 @@ class S3LogsParser
      */
     public function loadLogsFromS3(string $bucketName, string $bucketPrefix) : array
     {
-      $logLines = [];
-
       $listObjectsParams = [
           'Bucket' => $bucketName,
           'Prefix' => sprintf('%s%s', $bucketPrefix, Carbon::parse($date)->format('Y-m-d')),
       ];
 
+      $logLines = [];
       $results = $this->getClient()->getPaginator('ListObjects', $listObjectsParams);
 
       foreach ($results as $result) {
