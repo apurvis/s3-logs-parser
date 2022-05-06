@@ -136,7 +136,7 @@ class S3LogsParser
     {
       $logLines = [];
       $total_operations = [];
-      print $logDir;
+      print "Reading files from " . $logDir;
 
       foreach (new \DirectoryIterator($logDir) as $file) {
           if ($file->isFile()) {
@@ -155,8 +155,7 @@ class S3LogsParser
           }
       }
 
-      print "\n\n****TOTAL OPERATIONS****\n";
-      print print_r($total_operations);
+      print "\n\n****TOTAL OPERATIONS****\n" . print_r($total_operations);
       return $logLines;
     }
 
