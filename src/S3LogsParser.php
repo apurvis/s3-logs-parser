@@ -76,49 +76,96 @@ class S3LogsParser
      */
     public function getStats(string $bucketName, string $bucketPrefix, string $date)
     {
-        $statistics = [];
+        $logLines = [];
 
-        $listObjectsParams = [
-            'Bucket' => $bucketName,
-            'Prefix' => sprintf('%s%s', $bucketPrefix, Carbon::parse($date)->format('Y-m-d')),
-        ];
-
-        $results = $this->getClient()->getPaginator('ListObjects', $listObjectsParams);
-
-        foreach ($results as $result) {
-            if (isset($result['Contents'])) {
-                foreach ($result['Contents'] as $object) {
-                    $data = $this->parseObject($bucketName, $object['Key']);
-
-                    foreach ($data as $item) {
-                        if (isset($item['key']) && mb_strlen($item['key'])) {
-                            if (!isset($statistics[$item['key']]['downloads'])) {
-                                $statistics[$item['key']]['downloads'] = 0;
-                            }
-
-                            if (!isset($statistics[$item['key']]['bandwidth'])) {
-                                $statistics[$item['key']]['bandwidth'] = 0;
-                            }
-
-                            $statistics[$item['key']]['downloads'] += 1;
-
-                            if (isset($item['bytes'])) {
-                                $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
-                            }
-                        }
-                    }
-                }
-            }
+        if array_key_exists('logs_location', $this->configs) {
+          $logLines = $this->loadLogsFromLocalDir($this->getConfig('logs_location'));
+        } else {
+          $logLines = $this->loadLogsFromS3($bucketName, $bucketPrefix);
         }
 
         return json_encode([
             'success' => true,
             'statistics' => [
-                'bucket' => $listObjectsParams['Bucket'],
-                'prefix' => $listObjectsParams['Prefix'],
-                'data' => $statistics,
+                // 'bucket' => $listObjectsParams['Bucket'],
+                // 'prefix' => $listObjectsParams['Prefix'],
+                'data' => $this->extractStatistics($logLines),
             ],
         ]);
+    }
+
+    /**
+     * @param string $parsedLogs
+     *
+     * @return hash
+     */
+    public function loadLogsFromS3(string $bucketName, string $bucketPrefix, $date) : array
+    {
+        $listObjectsParams = [
+            'Bucket' => $bucketName,
+            'Prefix' => $bucketPrefix + (is_null($date) ? '' : Carbon::parse($date)->format('Y-m-d')),
+        ];
+
+        $results = $this->getClient()->getPaginator('ListObjects', $listObjectsParams);
+        $logLines = [];
+
+        foreach ($results as $result) {
+            if (isset($result['Contents'])) {
+                foreach ($result['Contents'] as $object) {
+                    $logLines += $this->parseS3Object($bucketName, $object['Key']);
+                }
+            }
+        }
+
+        return $logLines;
+    }
+
+    /**
+     * @param string $logDir
+     *
+     * @return hash
+     */
+    public function loadLogsFromLocalDir(string $logDir) : array
+    {
+      $logLines = [];
+
+      foreach (new DirectoryIterator($this->getConfig('logs_location')) as $file) {
+          if($file->isDot()) continue;
+          echo $file->getFilename() . "<br>\n";
+          $logLines += $this->processLogsStringToArray(file_get_contents($file, true));
+      }
+
+      return $logLines;
+    }
+
+    /**
+     * @param string $parsedLogs
+     *
+     * @return hash
+     */
+    public function extractStatistics(array $parsedLogs)
+    {
+        $statistics = [];
+
+        foreach ($parsedLogs as $item) {
+            if (isset($item['key']) && mb_strlen($item['key'])) {
+                if (!isset($statistics[$item['key']]['downloads'])) {
+                    $statistics[$item['key']]['downloads'] = 0;
+                }
+
+                if (!isset($statistics[$item['key']]['bandwidth'])) {
+                    $statistics[$item['key']]['bandwidth'] = 0;
+                }
+
+                $statistics[$item['key']]['downloads'] += 1;
+
+                if (isset($item['bytes'])) {
+                    $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
+                }
+            }
+        }
+
+        return $statistics;
     }
 
     /**
@@ -127,7 +174,7 @@ class S3LogsParser
      *
      * @return array
      */
-    public function parseObject(string $bucketName, string $key) : array
+    public function parseS3Object(string $bucketName, string $key) : array
     {
         $output = [];
 
@@ -136,7 +183,17 @@ class S3LogsParser
             'Key' => $key,
         ]);
 
-        $rows = explode("\n", (string) $file['Body']);
+        return $this->processLogsStringToArray((string) $file['Body']);
+    }
+
+    /**
+     * @param string $logsString
+     *
+     * @return array
+     */
+    public function processLogsStringToArray(string $logsString) : array
+    {
+        $rows = explode("\n", (string) $logsString);
 
         foreach ($rows as $row) {
             preg_match($this->regex, $row, $matches);
