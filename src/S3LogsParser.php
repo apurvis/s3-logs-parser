@@ -78,7 +78,7 @@ class S3LogsParser
     {
         $logLines = [];
 
-        if array_key_exists('logs_location', $this->configs) {
+        if (array_key_exists('logs_location', $this->configs)) {
           $logLines = $this->loadLogsFromLocalDir($this->getConfig('logs_location'));
         } else {
           $logLines = $this->loadLogsFromS3($bucketName, $bucketPrefix);
@@ -128,11 +128,18 @@ class S3LogsParser
     public function loadLogsFromLocalDir(string $logDir) : array
     {
       $logLines = [];
+      print $logDir;
 
-      foreach (new DirectoryIterator($this->getConfig('logs_location')) as $file) {
-          if($file->isDot()) continue;
-          echo $file->getFilename() . "<br>\n";
-          $logLines += $this->processLogsStringToArray(file_get_contents($file, true));
+      foreach (new \DirectoryIterator($logDir) as $file) {
+
+      //     print $file->getFilename();
+      //
+      //     if ($file->isDir()) {
+      //       continue;
+      //     }
+
+          $fileContents = file_get_contents($file->getPathname(), true);
+          $logLines = array_merge($logLines, $this->processLogsStringToArray($fileContents));
       }
 
       return $logLines;
@@ -193,7 +200,9 @@ class S3LogsParser
      */
     public function processLogsStringToArray(string $logsString) : array
     {
+        print $logsString;
         $rows = explode("\n", (string) $logsString);
+        $output = [];
 
         foreach ($rows as $row) {
             preg_match($this->regex, $row, $matches);

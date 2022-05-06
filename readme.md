@@ -22,7 +22,7 @@ $ composer require mtrdesign/s3-logs-parser
 
 ## Usage
 ### Read Log Files From Local Storage
-Extracts statistics much more quickly if you have already locally cached the logs.  (AWS CLI `aws s3 sync` is a handy way to do the mirroring.)
+Extracts statistics much more quickly if you have already downloaded the logs to local storage with something like AWS CLI `aws s3 sync`.
 
 ```php
 <?php
@@ -80,7 +80,7 @@ Things like `download`, `bandwidth`, etc.
 $S3LogsParser->getStats($awsBucketName, $awsBucketPrefix, $date);
 ```
 
-`getStats()` response should appear like this:
+`getStats()` response should be something like this:
 
 ```json
 {
