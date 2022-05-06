@@ -139,7 +139,7 @@ class S3LogsParser
 
       foreach (new \DirectoryIterator($logDir) as $file) {
           if ($file->isFile()) {
-            print $file->getFilename() . "\n";
+            // print $file->getFilename() . "\n";
             $fileContents = file_get_contents($file->getPathname(), true);
             $logLines = array_merge($logLines, $this->processLogsStringToArray($fileContents));
           }
@@ -167,9 +167,18 @@ class S3LogsParser
                     $statistics[$item['key']]['bandwidth'] = 0;
                 }
 
+                if (!isset($statistics[$item['key']]['dates'])) {
+                    $statistics[$item['key']]['dates'] = [];
+                }
+
                 $statistics[$item['key']]['downloads'] += 1;
+                #$parsedDate = Carbon::parse($item['time'])->format('[d/m/Y:H:i:s');
+                #print "Parsed date: ".$parsedDate;
+                #array_push($statistics[$item['key']]['dates'], $parsedDate);
 
                 if (isset($item['bytes'])) {
+                    print "Downloading ".$item['bytes']." from ".$item['key']."\n";
+                    print "\n\n".print_r($item)."\n\n";
                     $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
                 }
             }
