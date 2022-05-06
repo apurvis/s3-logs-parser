@@ -22,6 +22,7 @@ $ composer require mtrdesign/s3-logs-parser
 
 ## Usage
 
+### To Read Log Files Directly From S3 Bucket
 Create a service instance:
 
 ```php
@@ -49,6 +50,19 @@ $S3LogsParser->setConfigs([
     'region' => $awsBucketRegion,
     'access_key' => $awsAccessKey,
     'secret_key' => $awsSecretKey,
+]);
+
+?>
+```
+
+### To Read Log Files From Local Drive
+
+```php
+<?php
+
+$S3LogsParser->setConfigs([
+    'version' => 'latest',
+    'logs_location' => 'PATH/TO/LOGS/that_i_already_downloaded_from_s3/'
 ]);
 
 ?>
