@@ -72,7 +72,9 @@ $S3LogsParser->setConfigs([
 ### Extracting Statistics
 Things like `download`, `bandwidth`, etc.
 
-`$date` is an optional param.  It is recommended to pass a [Carbon](https://carbon.nesbot.com/) formatted date string as S3 logs tend to have filenames that look like `2022-05-02-19-18-32-91D293838329CB5E6`
+`$date` is an optional param.  Pass a [Carbon](https://carbon.nesbot.com/) formatted date string.  S3 logs tend to have filenames that look like `2022-05-02-19-18-32-91D293838329CB5E6`.  If `$date` is provided the `%Y-%m-%d` formatted date string will be used as a prefix to match log filenames.
+
+
 
 ```php
 $S3LogsParser->getStats($awsBucketName, $awsBucketPrefix, $date);
