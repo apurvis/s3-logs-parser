@@ -76,7 +76,7 @@ class S3LogsParser
      *
      * @return string|false
      */
-    public function getStats($bucketName = null, $bucketPrefix = null, $date = null)
+    public function getStats($bucketName = null, $bucketPrefix = null, $date = null) : array
     {
         $logLines = [];
 
@@ -86,14 +86,19 @@ class S3LogsParser
           $logLines = $this->loadLogsFromS3($bucketName, $bucketPrefix);
         }
 
-        return json_encode([
-            'success' => true,
-            'statistics' => [
-                // 'bucket' => $listObjectsParams['Bucket'],
-                // 'prefix' => $listObjectsParams['Prefix'],
-                'data' => $this->extractStatistics($logLines),
-            ],
-        ]);
+        return $this->extractStatistics($logLines);
+    }
+
+    public function getStatsAsJSON($bucketName = null, $bucketPrefix = null, $date = null) : string
+    {
+      return json_encode([
+          'success' => true,
+          'statistics' => [
+              // 'bucket' => $listObjectsParams['Bucket'],
+              // 'prefix' => $listObjectsParams['Prefix'],
+              'data' => $this->extractStatistics($logLines),
+          ],
+      ]);
     }
 
     /**
