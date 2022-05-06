@@ -145,23 +145,27 @@ class S3LogsParser
      */
     public function extractStatistics(array $parsedLogs)
     {
-      foreach ($parsedLogs as $item) {
-          if (isset($item['key']) && mb_strlen($item['key'])) {
-              if (!isset($statistics[$item['key']]['downloads'])) {
-                  $statistics[$item['key']]['downloads'] = 0;
-              }
+        $statistics = [];
 
-              if (!isset($statistics[$item['key']]['bandwidth'])) {
-                  $statistics[$item['key']]['bandwidth'] = 0;
-              }
+        foreach ($parsedLogs as $item) {
+            if (isset($item['key']) && mb_strlen($item['key'])) {
+                if (!isset($statistics[$item['key']]['downloads'])) {
+                    $statistics[$item['key']]['downloads'] = 0;
+                }
 
-              $statistics[$item['key']]['downloads'] += 1;
+                if (!isset($statistics[$item['key']]['bandwidth'])) {
+                    $statistics[$item['key']]['bandwidth'] = 0;
+                }
 
-              if (isset($item['bytes'])) {
-                  $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
-              }
-          }
-      }
+                $statistics[$item['key']]['downloads'] += 1;
+
+                if (isset($item['bytes'])) {
+                    $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
+                }
+            }
+        }
+
+        return $statistics;
     }
 
     /**
