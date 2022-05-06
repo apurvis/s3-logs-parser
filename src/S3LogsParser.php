@@ -156,7 +156,7 @@ class S3LogsParser
       }
 
       print "\n\n****TOTAL OPERATIONS****\n";
-      var_dump($total_operations);
+      print print_r($total_operations);
       return $logLines;
     }
 
@@ -179,6 +179,10 @@ class S3LogsParser
                     $statistics[$item['key']]['bandwidth'] = 0;
                 }
 
+                if (!isset($statistics[$item['key']]['totalRequestTimeInMinutes'])) {
+                    $statistics[$item['key']]['totalRequestTimeInMinutes'] = 0;
+                }
+
                 if (!isset($statistics[$item['key']]['dates'])) {
                     $statistics[$item['key']]['dates'] = [];
                 }
@@ -186,11 +190,18 @@ class S3LogsParser
                 $statistics[$item['key']]['downloads'] += 1;
                 $date = $this->parseLogDateString($item['time']);
                 array_push($statistics[$item['key']]['dates'], $date);
+                $statistics[$item['key']]['dates'] = array_unique($statistics[$item['key']]['dates']);
 
                 if (isset($item['bytes'])) {
-                    // print "Downloading ".$item['bytes']." from ".$item['key']."\n";
-                    // print "\n\n".print_r($item)."\n\n";
+                    print "DOWNLOADING ".$item['bytes']." from ".$item['key']."\n";
+                    // print "\n".print_r($item)."\n\n";
                     $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
+                }
+
+                if (isset($item['totaltime'])) {
+                    $totalRequestTimeInMinutes = (float) $item['totaltime'] / 1000.0 / 60.0;
+                    print "  TOTAL TIME IN MINUTES". $totalRequestTimeInMinutes . "\n";
+                    $statistics[$item['key']]['totalRequestTimeInMinutes'] += $totalRequestTimeInMinutes;
                 }
             }
         }
