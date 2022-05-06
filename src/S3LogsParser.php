@@ -189,13 +189,18 @@ class S3LogsParser
                 $statistics[$item['key']]['downloads'] += 1;
                 $date = $this->parseLogDateString($item['time']);
 
+                // TODO: This should be an optional parameter
+                if ($date < '2022-04-16') {
+                    continue;
+                }
+
                 if (!in_array($date, $statistics[$item['key']]['dates'])) {
                   array_push($statistics[$item['key']]['dates'], $date);
                 }
 
                 if (isset($item['bytes'])) {
                     print "DOWNLOADING ".$item['bytes']." from ".$item['key']."\n";
-                    // print "\n".print_r($item)."\n\n";
+                    print "\n".print_r($item)."\n\n";
                     $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
                 }
 
