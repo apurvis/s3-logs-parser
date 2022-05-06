@@ -70,21 +70,15 @@ $S3LogsParser->setConfigs([
 ```
 
 ### Extracting Statistics
-E.g. `download`, `bandwidth`, Etc.
+Things like `download`, `bandwidth`, etc.
 
-`$date` is an optional param.  It is recommended to pass a [Carbon](https://carbon.nesbot.com/) formatted date string.
+`$date` is an optional param.  It is recommended to pass a [Carbon](https://carbon.nesbot.com/) formatted date string as S3 logs tend to have filenames that look like `2022-05-02-19-18-32-91D293838329CB5E6`
 
 ```php
-<?php
-
 $S3LogsParser->getStats($awsBucketName, $awsBucketPrefix, $date);
-
-?>
 ```
 
-### Service Response
-
-This is how service response should appear:
+`getStats()` response should appear like this:
 
 ```json
 {

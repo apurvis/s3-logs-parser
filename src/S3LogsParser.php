@@ -99,25 +99,25 @@ class S3LogsParser
      *
      * @return hash
      */
-    public function loadLogsFromS3(string $bucketName, string $bucketPrefix) : array
+    public function loadLogsFromS3(string $bucketName, string $bucketPrefix, $date) : array
     {
-      $listObjectsParams = [
-          'Bucket' => $bucketName,
-          'Prefix' => sprintf('%s%s', $bucketPrefix, Carbon::parse($date)->format('Y-m-d')),
-      ];
+        $listObjectsParams = [
+            'Bucket' => $bucketName,
+            'Prefix' => $bucketPrefix + (is_null($date) ? '' : Carbon::parse($date)->format('Y-m-d')),
+        ];
 
-      $logLines = [];
-      $results = $this->getClient()->getPaginator('ListObjects', $listObjectsParams);
+        $results = $this->getClient()->getPaginator('ListObjects', $listObjectsParams);
+        $logLines = [];
 
-      foreach ($results as $result) {
-          if (isset($result['Contents'])) {
-              foreach ($result['Contents'] as $object) {
-                  $logLines += $this->parseS3Object($bucketName, $object['Key']);
-              }
-          }
-      }
+        foreach ($results as $result) {
+            if (isset($result['Contents'])) {
+                foreach ($result['Contents'] as $object) {
+                    $logLines += $this->parseS3Object($bucketName, $object['Key']);
+                }
+            }
+        }
 
-      return $logLines;
+        return $logLines;
     }
 
     /**
