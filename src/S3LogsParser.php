@@ -18,6 +18,7 @@ class S3LogsParser
         'access_key' => '',
         'secret_key' => '',
         'logs_location' => '',
+        'exclude_lines_matching' => null,
     ];
 
     /** @var string $regex https://docs.aws.amazon.com/AmazonS3/latest/dev/LogFormat.html */
@@ -132,19 +133,11 @@ class S3LogsParser
       print $logDir;
 
       foreach (new \DirectoryIterator($logDir) as $file) {
-
-      //     print $file->getFilename();
-      //
-      //     if ($file->isDir()) {
-      //       continue;
-      //     }
-
           if ($file->isFile()) {
             print $file->getFilename() . "\n";
+            $fileContents = file_get_contents($file->getPathname(), true);
+            $logLines = array_merge($logLines, $this->processLogsStringToArray($fileContents));
           }
-
-          $fileContents = file_get_contents($file->getPathname(), true);
-          $logLines = array_merge($logLines, $this->processLogsStringToArray($fileContents));
       }
 
       return $logLines;
@@ -209,6 +202,13 @@ class S3LogsParser
         $output = [];
 
         foreach ($rows as $row) {
+            $exclude_lines_matching = $this->getConfig('exclude_lines_matching');
+
+            // Skip rows containing exclusion string
+            if (!is_null($exclude_lines_matching) && str_contains($row, $exclude_lines_matching)) {
+              continue;
+            }
+
             preg_match($this->regex, $row, $matches);
 
             if (isset($matches['operation']) && $matches['operation'] == 'REST.GET.OBJECT') {
