@@ -189,8 +189,10 @@ class S3LogsParser
 
                 $statistics[$item['key']]['downloads'] += 1;
                 $date = $this->parseLogDateString($item['time']);
-                array_push($statistics[$item['key']]['dates'], $date);
-                $statistics[$item['key']]['dates'] = array_unique($statistics[$item['key']]['dates']);
+
+                if (!in_array($date, $statistics[$item['key']]['dates'])) {
+                  array_push($statistics[$item['key']]['dates'], $date);
+                }
 
                 if (isset($item['bytes'])) {
                     print "DOWNLOADING ".$item['bytes']." from ".$item['key']."\n";
