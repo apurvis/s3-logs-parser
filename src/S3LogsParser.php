@@ -6,6 +6,10 @@ use Aws\Credentials\Credentials;
 use Aws\S3\S3Client;
 use Carbon\Carbon;
 
+
+class S3LogsParserException extends Exception { }
+
+
 class S3LogsParser
 {
     /** @var \Aws\S3\S3Client|null $client */
@@ -26,6 +30,8 @@ class S3LogsParser
         '(?P<requester>\S+) (?P<reqid>\S+) (?P<operation>\S+) (?P<key>\S+) (?P<request>"[^"]*") '.
         '(?P<status>\S+) (?P<error>\S+) (?P<bytes>\S+) (?P<size>\S+) (?P<totaltime>\S+) '.
         '(?P<turnaround>\S+) (?P<referrer>"[^"]*") (?P<useragent>"[^"]*") (?P<version>\S)/';
+
+    const COLUMNS_TO_KEEP_RUNNING_TOTALS_FOR = ['totaltime', 'downloads', 'bandwidth', 'totalRequestTimeInMinutes'];
 
     /**
      * S3LogsParser constructor.
@@ -74,30 +80,41 @@ class S3LogsParser
      * @param string $bucketPrefix
      * @param string $date
      *
-     * @return string|false
+     * @return array
      */
     public function getStats($bucketName = null, $bucketPrefix = null, $date = null) : array
     {
-        $logLines = [];
-
         if (array_key_exists('logs_location', $this->configs)) {
-          $logLines = $this->loadLogsFromLocalDir($this->getConfig('logs_location'));
+          $logsLocation = $this->getConfig('logs_location');
+          if (!is_dir($logsLocation)) throw new S3LogsParserException($logsLocation . ' is not a directory!');
+          $logLines = $this->loadLogsFromLocalDir($logsLocation);
         } else {
-          $logLines = $this->loadLogsFromS3($bucketName, $bucketPrefix);
+          if (is_null($bucketName)) throw new S3LogsParserException('bucketName not provided!');
+          $logLines = $this->loadLogsFromS3($bucketName, $bucketPrefix, $date);
         }
 
-        return $this->extractStatistics($logLines);
+        return $this->computeStatistics($logLines);
     }
 
-    public function getStatsAsJSON($bucketName = null, $bucketPrefix = null, $date = null) : string
+    /**
+     * @param string $bucketName
+     * @param string $bucketPrefix
+     * @param string $date
+     *
+     * @return string|false
+     */
+    public function getStatsAsJSON($bucketName = null, $prefix = null, $date = null) : string
     {
+      $logStats = ['data' => $this->getStats($bucketName, $prefix, $date)];
+
+      if (!is_null($bucketName)) {
+        $logStats['bucket'] = $bucketName;
+        $logStats['prefix'] = $prefix;
+      }
+
       return json_encode([
           'success' => true,
-          'statistics' => [
-              // 'bucket' => $listObjectsParams['Bucket'],
-              // 'prefix' => $listObjectsParams['Prefix'],
-              'data' => $this->extractStatistics($logLines),
-          ],
+          'statistics' => $logStats,
       ]);
     }
 
@@ -164,22 +181,16 @@ class S3LogsParser
      *
      * @return hash
      */
-    public function extractStatistics(array $parsedLogs)
+    public function computeStatistics(array $parsedLogs)
     {
         $statistics = [];
 
         foreach ($parsedLogs as $item) {
             if (isset($item['key']) && mb_strlen($item['key'])) {
-                if (!isset($statistics[$item['key']]['downloads'])) {
-                    $statistics[$item['key']]['downloads'] = 0;
-                }
-
-                if (!isset($statistics[$item['key']]['bandwidth'])) {
-                    $statistics[$item['key']]['bandwidth'] = 0;
-                }
-
-                if (!isset($statistics[$item['key']]['totalRequestTimeInMinutes'])) {
-                    $statistics[$item['key']]['totalRequestTimeInMinutes'] = 0;
+                foreach(self::COLUMNS_TO_KEEP_RUNNING_TOTALS_FOR as $column_name) {
+                    if (!isset($statistics[$item['key']][$column_name])) {
+                        $statistics[$item['key']][$column_name] = 0;
+                    }
                 }
 
                 if (!isset($statistics[$item['key']]['dates'])) {
@@ -206,7 +217,7 @@ class S3LogsParser
 
                 if (isset($item['totaltime'])) {
                     $totalRequestTimeInMinutes = (float) $item['totaltime'] / 1000.0 / 60.0;
-                    print "  TOTAL TIME IN MINUTES". $totalRequestTimeInMinutes . "\n";
+                    print "  TOTAL REQUEST TIME IN MINUTES". $totalRequestTimeInMinutes . "\n";
                     $statistics[$item['key']]['totalRequestTimeInMinutes'] += $totalRequestTimeInMinutes;
                 }
             }
@@ -223,8 +234,6 @@ class S3LogsParser
      */
     public function parseS3Object(string $bucketName, string $key) : array
     {
-        $output = [];
-
         $file = $this->getClient()->getObject([
             'Bucket' => $bucketName,
             'Key' => $key,
@@ -240,9 +249,9 @@ class S3LogsParser
      */
     public function processLogsStringToArray(string $logsString) : array
     {
-        $rows = explode("\n", (string) $logsString);
-        $output = [];
-        $operations = [];
+        $rows = explode("\n", $logsString);
+        $processedLogs = [];
+        $operationCounts = [];
 
         foreach ($rows as $row) {
             $exclude_lines_matching = $this->getConfig('exclude_lines_matching');
@@ -253,25 +262,25 @@ class S3LogsParser
             }
 
             preg_match($this->regex, $row, $matches);
-            // var_dump($matches);
+
             if (array_key_exists('operation', $matches)) {
                 $operation = $matches['operation'];
 
-                if (!array_key_exists($operation, $operations)) {
-                    $operations[$operation] = 0;
+                if (!array_key_exists($operation, $operationCounts)) {
+                    $operationCounts[$operation] = 0;
                 }
 
-                $operations[$matches['operation']] += 1;
+                $operationCounts[$operation] += 1;
             }
 
             if (isset($matches['operation']) && $matches['operation'] == 'REST.GET.OBJECT') {
-                $output[] = $matches;
+                $processedLogs[] = $matches;
             }
         }
 
         return [
-            'operations' => $operations,
-            'output' => $output
+            'operations' => $operationCounts,
+            'output' => $processedLogs
         ];
     }
 
@@ -307,3 +316,5 @@ class S3LogsParser
         return Carbon::createFromFormat('d/M/Y', $dateString)->format('Y-m-d');
     }
 }
+
+?>
