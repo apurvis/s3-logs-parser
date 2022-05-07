@@ -18,11 +18,12 @@ class S3LogsParser
     /** @var array $configs */
     protected $configs = [
         'version' => 'latest',
+        'debug_mode' => true,
         'region' => '',
         'access_key' => '',
         'secret_key' => '',
         'logs_location' => '',
-        'exclude_lines_matching' => null,
+        'exclude_lines_with_substring' => null,
     ];
 
     /** @var string $regex https://docs.aws.amazon.com/AmazonS3/latest/dev/LogFormat.html */
@@ -67,6 +68,8 @@ class S3LogsParser
                 if (mb_strlen($key) && mb_strlen($value)) {
                     if (array_key_exists($key, $this->configs)) {
                         $this->configs[$key] = $value;
+                    } else {
+                        print "WARNING: " . $key . " is not a configuration parameter; ignoring.\n\n";
                     }
                 }
             }
@@ -164,14 +167,17 @@ class S3LogsParser
     {
       $logLines = [];
       $total_operations = [];
-      print "Reading files from " . $logDir;
+      print "Reading files from " . $logDir . "\n";
 
       foreach (new \DirectoryIterator($logDir) as $file) {
           if ($file->isFile()) {
-              // print 'Processing file: ' . $file->getFilename() . "...\n";
               $fileContents = file_get_contents($file->getPathname(), true);
               $processedLogs = $this->processLogsStringToArray($fileContents);
               $logLines = array_merge($logLines, $processedLogs['output']);
+
+              if ($this->debugMode()) {
+                print 'Read ' . count($processedLogs['output']) . ' lines from file: ' . $file->getFilename() . "...\n";
+              }
 
               foreach ($processedLogs['operations'] as $operation_name => $count) {
                   if (!array_key_exists($operation_name, $total_operations)) {
@@ -260,10 +266,11 @@ class S3LogsParser
         $operationCounts = [];
 
         foreach ($rows as $row) {
-            $exclude_lines_matching = $this->getConfig('exclude_lines_matching');
+            $exclude_lines_with_substring = $this->getConfig('exclude_lines_with_substring');
 
             // Skip rows containing exclusion string
-            if (!is_null($exclude_lines_matching) && str_contains($row, $exclude_lines_matching)) {
+            if (!empty($exclude_lines_with_substring) && str_contains($row, $exclude_lines_with_substring)) {
+              print "WARNING: Skipping excluded row:\n" . $row . "\n\n";
               continue;
             }
 
@@ -282,6 +289,11 @@ class S3LogsParser
             if (isset($matches['operation']) && $matches['operation'] == 'REST.GET.OBJECT') {
                 $processedLogs[] = $matches;
             }
+        }
+
+        if ($this->debugMode()) {
+            print "\n\nPROCESSED DATA:";
+            var_dump($processedLogs);
         }
 
         return [
@@ -320,6 +332,14 @@ class S3LogsParser
         $dateString = ltrim($dateString, '[');
         $dateString = explode(':', $dateString)[0];
         return Carbon::createFromFormat('d/M/Y', $dateString)->format('Y-m-d');
+    }
+
+    /**
+     * @return true|false
+     */
+    private function debugMode()
+    {
+        return $this->getConfig('debug_mode');
     }
 }
 
