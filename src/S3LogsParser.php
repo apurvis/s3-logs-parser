@@ -7,7 +7,7 @@ use Aws\S3\S3Client;
 use Carbon\Carbon;
 
 
-class S3LogsParserException extends Exception { }
+class S3LogsParserException extends \Exception { }
 
 
 class S3LogsParser
@@ -86,10 +86,21 @@ class S3LogsParser
     {
         if (array_key_exists('logs_location', $this->configs)) {
           $logsLocation = $this->getConfig('logs_location');
-          if (!is_dir($logsLocation)) throw new S3LogsParserException($logsLocation . ' is not a directory!');
+
+          if (!is_dir($logsLocation)) {
+              throw new S3LogsParserException($logsLocation . ' is not a directory!');
+          }
+
+          if (isset($date)) {
+              print "WARNING: date parameter is not currently supported for local files.";
+          }
+
           $logLines = $this->loadLogsFromLocalDir($logsLocation);
         } else {
-          if (is_null($bucketName)) throw new S3LogsParserException('bucketName not provided!');
+          if (is_null($bucketName)) {
+              throw new S3LogsParserException('bucketName not provided!');
+          }
+
           $logLines = $this->loadLogsFromS3($bucketName, $bucketPrefix, $date);
         }
 
@@ -199,11 +210,6 @@ class S3LogsParser
 
                 $statistics[$item['key']]['downloads'] += 1;
                 $date = $this->parseLogDateString($item['time']);
-
-                // TODO: This should be an optional parameter
-                if ($date < '2022-04-16') {
-                    continue;
-                }
 
                 if (!in_array($date, $statistics[$item['key']]['dates'])) {
                   array_push($statistics[$item['key']]['dates'], $date);
