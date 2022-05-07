@@ -29,7 +29,7 @@ Extracts statistics much more quickly if you have already downloaded the logs to
 
 $S3LogsParser->setConfigs([
     'version' => 'latest',
-    'logs_location' => 'path/to/logs/that_i_already_downloaded/'
+    'local_log_dir' => 'path/to/logs/that_i_already_downloaded/'
 ]);
 
 ?>
@@ -101,6 +101,9 @@ $S3LogsParser->getStats($awsBucketName, $awsBucketPrefix, $date);
     }
 }
 ```
+
+## Development
+You can set the optional configuration parameter `debug_mode` to see a more verbose output.
 
 ## License
 

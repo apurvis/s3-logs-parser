@@ -18,12 +18,12 @@ class S3LogsParser
     /** @var array $configs */
     protected $configs = [
         'version' => 'latest',
-        'debug_mode' => true,
+        'debug_mode' => false,
         'region' => '',
         'access_key' => '',
         'secret_key' => '',
-        'logs_location' => '',
-        'exclude_lines_with_substring' => null,
+        'local_log_dir' => '',
+        'exclude_lines_with_substring' => '',
     ];
 
     /** @var string $regex https://docs.aws.amazon.com/AmazonS3/latest/dev/LogFormat.html */
@@ -87,8 +87,8 @@ class S3LogsParser
      */
     public function getStats($bucketName = null, $bucketPrefix = null, $date = null) : array
     {
-        if (array_key_exists('logs_location', $this->configs)) {
-          $logsLocation = $this->getConfig('logs_location');
+        if (array_key_exists('local_log_dir', $this->configs)) {
+          $logsLocation = $this->getConfig('local_log_dir');
 
           if (!is_dir($logsLocation)) {
               throw new S3LogsParserException($logsLocation . ' is not a directory!');
@@ -179,7 +179,7 @@ class S3LogsParser
                 print 'Read ' . count($processedLogs['output']) . ' lines from file: ' . $file->getFilename() . "...\n";
               }
 
-              foreach ($processedLogs['operationCounts'] as $operation_name => $count) {
+              foreach ($processedLogs['httpOperationCounts'] as $operation_name => $count) {
                   if (!array_key_exists($operation_name, $operation_count_totals)) {
                       $operation_count_totals[$operation_name] = 0;
                   }
@@ -189,7 +189,7 @@ class S3LogsParser
           }
       }
 
-      print "\n\n****TOTAL OPERATIONS****\n" . print_r($operation_count_totals);
+      print "\n\n****HTTP OPERATION COUNTS****\n" . print_r($operation_count_totals);
       return $logLines;
     }
 
@@ -266,7 +266,8 @@ class S3LogsParser
     {
         $rows = explode("\n", $logsString);
         $processedLogs = [];
-        $operationCounts = [];
+        $httpOperationCounts = [];
+        $excludedRowsCount = 0;
 
         foreach ($rows as $row) {
             $exclude_lines_with_substring = $this->getConfig('exclude_lines_with_substring');
@@ -274,6 +275,7 @@ class S3LogsParser
             // Skip rows containing exclusion string
             if (!empty($exclude_lines_with_substring) && str_contains($row, $exclude_lines_with_substring)) {
               print "WARNING: Skipping excluded row:\n" . $row . "\n\n";
+              $excludedRowsCount += 1;
               continue;
             }
 
@@ -282,11 +284,11 @@ class S3LogsParser
             if (array_key_exists('operation', $matches)) {
                 $operation = $matches['operation'];
 
-                if (!array_key_exists($operation, $operationCounts)) {
-                    $operationCounts[$operation] = 0;
+                if (!array_key_exists($operation, $httpOperationCounts)) {
+                    $httpOperationCounts[$operation] = 0;
                 }
 
-                $operationCounts[$operation] += 1;
+                $httpOperationCounts[$operation] += 1;
             }
 
             if (isset($matches['operation']) && $matches['operation'] == 'REST.GET.OBJECT') {
@@ -300,8 +302,10 @@ class S3LogsParser
         }
 
         return [
-            'operationCounts' => $operationCounts,
-            'output' => $processedLogs
+            'httpOperationCounts' => $httpOperationCounts,
+            'output' => $processedLogs,
+            'rowCount' => count($rows),
+            '$excludedRowsCount' => $$excludedRowsCount = 0,
         ];
     }
 
