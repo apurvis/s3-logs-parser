@@ -166,7 +166,7 @@ class S3LogsParser
     public function loadLogsFromLocalDir(string $logDir) : array
     {
       $logLines = [];
-      $total_operations = [];
+      $operation_count_totals = [];
       print "Reading files from " . $logDir . "\n";
 
       foreach (new \DirectoryIterator($logDir) as $file) {
@@ -179,17 +179,17 @@ class S3LogsParser
                 print 'Read ' . count($processedLogs['output']) . ' lines from file: ' . $file->getFilename() . "...\n";
               }
 
-              foreach ($processedLogs['operations'] as $operation_name => $count) {
-                  if (!array_key_exists($operation_name, $total_operations)) {
-                      $total_operations[$operation_name] = 0;
+              foreach ($processedLogs['operationCounts'] as $operation_name => $count) {
+                  if (!array_key_exists($operation_name, $operation_count_totals)) {
+                      $operation_count_totals[$operation_name] = 0;
                   }
 
-                  $total_operations[$operation_name] += (int) $count;
+                  $operation_count_totals[$operation_name] += (int) $count;
               }
           }
       }
 
-      print "\n\n****TOTAL OPERATIONS****\n" . print_r($total_operations);
+      print "\n\n****TOTAL OPERATIONS****\n" . print_r($operation_count_totals);
       return $logLines;
     }
 
@@ -222,14 +222,17 @@ class S3LogsParser
                 }
 
                 if (isset($item['bytes'])) {
-                    print "DOWNLOADING ".$item['bytes']." from ".$item['key']."\n";
-                    print "\n".print_r($item)."\n\n";
+                    if ($this->debugMode()) {
+                        print "DEBUG: OBJECT DOWNLOAD: " . $item['bytes'] . " bytes from " . $item['key'] . "\n";
+                        print "\n" . print_r($item) . "\n\n";
+                    }
+
                     $statistics[$item['key']]['bandwidth'] += (int) $item['bytes'];
                 }
 
+                // TODO: Sum milliseconds now; convert to minutes later.
                 if (isset($item['totaltime'])) {
                     $totalRequestTimeInMinutes = (float) $item['totaltime'] / 1000.0 / 60.0;
-                    print "  TOTAL REQUEST TIME IN MINUTES". $totalRequestTimeInMinutes . "\n";
                     $statistics[$item['key']]['totalRequestTimeInMinutes'] += $totalRequestTimeInMinutes;
                 }
             }
@@ -297,7 +300,7 @@ class S3LogsParser
         }
 
         return [
-            'operations' => $operationCounts,
+            'operationCounts' => $operationCounts,
             'output' => $processedLogs
         ];
     }
