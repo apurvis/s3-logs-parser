@@ -166,7 +166,7 @@ class S3LogsParser
     public function loadLogsFromLocalDir(string $logDir) : array
     {
       $logLines = [];
-      $operation_count_totals = [];
+      $httpOperationCounts = [];
       print "Reading files from " . $logDir . "\n";
 
       foreach (new \DirectoryIterator($logDir) as $file) {
@@ -179,17 +179,17 @@ class S3LogsParser
                 print 'Read ' . count($processedLogs['output']) . ' lines from file: ' . $file->getFilename() . "...\n";
               }
 
-              foreach ($processedLogs['httpOperationCounts'] as $operation_name => $count) {
-                  if (!array_key_exists($operation_name, $operation_count_totals)) {
-                      $operation_count_totals[$operation_name] = 0;
+              foreach ($processedLogs['httpOperationCounts'] as $httpOperationName => $count) {
+                  if (!array_key_exists($httpOperationName, $httpOperationCounts)) {
+                      $httpOperationCounts[$httpOperationName] = 0;
                   }
 
-                  $operation_count_totals[$operation_name] += (int) $count;
+                  $httpOperationCounts[$httpOperationName] += (int) $count;
               }
           }
       }
 
-      print "\n\n****HTTP OPERATION COUNTS****\n" . print_r($operation_count_totals);
+      print "\n\n****HTTP OPERATION COUNTS****\n" . print_r($httpOperationCounts);
       return $logLines;
     }
 
@@ -282,13 +282,13 @@ class S3LogsParser
             preg_match($this->regex, $row, $matches);
 
             if (array_key_exists('operation', $matches)) {
-                $operation = $matches['operation'];
+                $httpOperationName = $matches['operation'];
 
-                if (!array_key_exists($operation, $httpOperationCounts)) {
-                    $httpOperationCounts[$operation] = 0;
+                if (!array_key_exists($httpOperationName, $httpOperationCounts)) {
+                    $httpOperationCounts[$httpOperationName] = 0;
                 }
 
-                $httpOperationCounts[$operation] += 1;
+                $httpOperationCounts[$httpOperationName] += 1;
             }
 
             if (isset($matches['operation']) && $matches['operation'] == 'REST.GET.OBJECT') {
